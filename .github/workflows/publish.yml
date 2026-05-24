@@ -1,0 +1,45 @@
+name: Publish
+
+# Publishes @agentflowx/bot-sdk to npm on a `v*` tag push.
+#
+# Owner action (one-time):
+#   1. Generate an npm automation token at https://www.npmjs.com/settings/<user>/tokens
+#      with publish scope on @agentflowx (org or per-package).
+#   2. Add it as repo secret: `gh secret set NPM_TOKEN -R AgentFlowX/bot-sdk-typescript`
+#
+# Release:
+#   npm version minor --no-git-tag-version
+#   git add package.json && git commit -m "release: v$(node -p 'require("./package.json").version')"
+#   git tag v0.2.0
+#   git push --tags
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@agentflowx'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
