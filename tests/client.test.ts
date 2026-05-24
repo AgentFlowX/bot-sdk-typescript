@@ -52,6 +52,88 @@ test('BotClient.joinRoom: posts alias', async () => {
   assert.equal(r.room_id, '!r:y');
 });
 
+test('BotClient.setWebhook: posts url + secret', async () => {
+  let body: string | null = null;
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch((_u, init) => {
+      body = String(init.body);
+      return new Response(JSON.stringify({ ok: true, url: 'https://hook.test' }), { status: 200 });
+    }),
+  });
+  await bot.setWebhook({ url: 'https://hook.test', secret: 'sekret123' });
+  const parsed = JSON.parse(body as unknown as string);
+  assert.equal(parsed.url, 'https://hook.test');
+  assert.equal(parsed.secret, 'sekret123');
+});
+
+test('BotClient.deleteWebhook: posts empty body', async () => {
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch(() => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+  });
+  const r = await bot.deleteWebhook();
+  assert.equal(r.ok, true);
+});
+
+test('BotClient.getWebhookInfo: returns has_webhook flag', async () => {
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch(() =>
+      new Response(JSON.stringify({ ok: true, url: 'https://x.io', has_webhook: true }), {
+        status: 200,
+      }),
+    ),
+  });
+  const r = await bot.getWebhookInfo();
+  assert.equal(r.has_webhook, true);
+  assert.equal(r.url, 'https://x.io');
+});
+
+test('BotClient.registerWidget: sends room_id + url + name', async () => {
+  let body: string | null = null;
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch((_u, init) => {
+      body = String(init.body);
+      return new Response(
+        JSON.stringify({ ok: true, event_id: '$abc', widget_id: 'darts' }),
+        { status: 200 },
+      );
+    }),
+  });
+  await bot.registerWidget({ room_id: '!r:y', url: 'https://darts.io', name: 'Darts' });
+  const parsed = JSON.parse(body as unknown as string);
+  assert.equal(parsed.room_id, '!r:y');
+  assert.equal(parsed.name, 'Darts');
+});
+
+test('BotClient.createTable: returns table_id', async () => {
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch(() =>
+      new Response(
+        JSON.stringify({ ok: true, table_id: 42, room_id: '!t:y', game: 'durak' }),
+        { status: 200 },
+      ),
+    ),
+  });
+  const r = await bot.createTable({ game: 'durak', config: { players: 2 } });
+  assert.equal(r.table_id, 42);
+  assert.equal(r.game, 'durak');
+});
+
+test('BotClient.setTableState: posts state + version returned', async () => {
+  const bot = new BotClient({
+    token: 'af_bot_' + 'a'.repeat(64),
+    fetcher: mockFetch(() =>
+      new Response(JSON.stringify({ ok: true, version: 7 }), { status: 200 }),
+    ),
+  });
+  const r = await bot.setTableState({ table_id: 1, state: { turn: 'p1' } });
+  assert.equal(r.version, 7);
+});
+
 test('BotClient: respects custom host', async () => {
   let capturedUrl = '';
   const bot = new BotClient({
